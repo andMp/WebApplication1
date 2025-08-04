@@ -1,0 +1,63 @@
+﻿@model WebApplication1.Models.TaskItem
+@{
+    var tasks = ViewBag.Tasks as List<WebApplication1.Models.TaskItem> ?? new();
+}
+
+<h1>Список задач</h1>
+
+<form asp-action="Add" method="post" style="display:flex; gap:10px; align-items:center;">
+    <div>
+        <input asp-for="Title" placeholder="Назва задачі" />
+        <span asp-validation-for="Title" style="color:red; display:block"></span>
+    </div>
+
+    <div>
+        <input asp-for="Description" placeholder="Опис задачі" />
+        <span asp-validation-for="Description" style="color:red ; display:block"></span>
+    </div>
+
+    <label style="display:flex; align-items:center; gap:5px">
+        <input asp-for="IsCompleted" /> Виконано?
+    </label>
+
+    <button type="submit">Додати</button>
+</form>
+
+<hr />
+
+<table border="1">
+    <thead>
+        <tr>
+            <th>Назва</th>
+            <th>Опис</th>
+            <th>Стан</th>
+            <th>Дії</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var task in tasks)
+        {
+            <tr>
+                <td>@task.Title</td>
+                <td>@task.Description</td>
+                <td>@(task.IsCompleted ? "✔️" : "❌")</td>
+                <td>
+                    <form asp-action="ToggleComplete" method="post" style="display:inline">
+                        <input type="hidden" name="id" value="@task.Id" />
+                        <button type="submit">Перемкнути</button>
+                    </form>
+                    <form asp-action="Delete" method="post" style="display:inline">
+                        <input type="hidden" name="id" value="@task.Id" />
+                        <button type="submit" onclick="return confirm('Видалити задачу?')">Видалити</button>
+                    </form>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+
+@section Scripts {
+    @{
+        await Html.RenderPartialAsync("_ValidationScriptsPartial");
+    }
+}

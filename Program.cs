@@ -1,90 +1,38 @@
 using Microsoft.AspNetCore.Http;
+/*Создайте веб-приложение на ASP.NET Core, где пользователь сможет добавлять задачи через форму,
+а задачи будут сохраняться в JSON-файл на сервере. 
+На странице также нужно отображать список всех задач, загружая их из этого JSON-файла.
 
-/*Разработать middleware, которое динамически добавляет баннер в начало каждой HTML-страницы,
-возвращаемой сервером.
+Создание формы для добавления задачи:
+На главной странице разместите форму с полями:
+Название задачи (title)
+Описание задачи (description)
+Статус задачи (isCompleted — checkbox).
+Форма должна отправлять данные на сервер с помощью POST-запроса.
 
-Требования:
-Middleware должно изменять тело HTML-ответа перед отправкой клиенту.
-Вставлять <div> с текстом "Добро пожаловать! Сегодня скидка 10%!" перед тегом <body>.*/
+Сохранение задачи в JSON-файл:
+На сервере создайте модель для задачи (например, класс TaskItem с полями Id, Title, Description, IsCompleted).
+При получении данных из формы, добавьте новую задачу в список задач.
+Сохраните этот список в JSON-файл (например, tasks.json) на сервере. Используйте System.Text.Json для сериализации.
 
+Загрузка и отображение задач:
+При загрузке страницы загрузите данные из JSON-файла и отобразите список задач на странице.
+Можно использовать простую HTML-разметку для отображения задач (например, таблицу или список).
+
+Добавьте возможность отмечать задачу как выполненную.
+Реализуйте удаление задачи.*/
 
 
 var builder = WebApplication.CreateBuilder(args);
+builder.Services.AddControllersWithViews();
+
 var app = builder.Build();
 
-// Middleware для додавання банера
-app.Use(async (context, next) =>
-{
-    // Зберігаємо оригінальний потік
-    var origStan = context.Response.Body;
+app.UseStaticFiles();
+app.UseRouting();
 
-    using (var memoryStream = new MemoryStream())
-    {
-        context.Response.Body = memoryStream; // Перенаправляємо потік
-
-        await next(); // Виконуємо наступний middleware або обробник запиту
-
-        // Перевіряємо, чи відповідає HTML
-        if (context.Response.ContentType != null && context.Response.ContentType.Contains("text/html"))
-        {
-            memoryStream.Seek(0, SeekOrigin.Begin);
-            var reader = new StreamReader(memoryStream);
-            string originalHtml = await reader.ReadToEndAsync();
-
-            // Додаємо банер перед <body>
-            string modifiedHtml = dodBan(originalHtml);
-
-            context.Response.Body = origStan; // Повертаємо потік
-            context.Response.ContentLength = modifiedHtml.Length; // Виправляємо довжину
-            await context.Response.WriteAsync(modifiedHtml);
-        }
-        else
-        {
-            memoryStream.Seek(0, SeekOrigin.Begin);
-            await memoryStream.CopyToAsync(origStan);
-        }
-    }
-});
-
-// Обробник основних маршрутів
-app.Run(async (context) =>
-{
-    context.Response.ContentType = "text/html; charset=utf-8";
-
-    if (context.Request.Path == "/postuser" && context.Request.Method == "POST")
-    {
-        var form = await context.Request.ReadFormAsync();
-        string name = form["name"];
-        string age = form["age"];
-
-        // Формуємо динамічну HTML-сторінку
-        string vidpovidHtml = $"<html><body><div><p>Ім'я: {name}</p><p>Вік: {age}</p></div></body></html>";
-
-        await context.Response.WriteAsync(vidpovidHtml);
-    }
-    else
-    {
-        await context.Response.SendFileAsync("html/index.html");
-    }
-});
+app.MapControllerRoute(
+    name: "default",
+    pattern: "{controller=Task}/{action=Index}/{id?}");
 
 app.Run();
-
-string dodBan(string html)
-{
-    string banner = "<div style='background-color: lightblue; text-align: center;'>Добро пожаловать! Сегодня скидка 10%!</div>";
-    string bodyTag = "<body";
-    int bodyIndex = html.IndexOf(bodyTag, StringComparison.OrdinalIgnoreCase);
-
-    if (bodyIndex >= 0)
-    {
-        int bodyEndIndex = html.IndexOf(">", bodyIndex);
-        if (bodyEndIndex > bodyIndex)
-        {
-            // Вставляємо банер одразу після <body>
-            html = html.Insert(bodyEndIndex + 1, banner);
-        }
-    }
-
-    return html;
-}
