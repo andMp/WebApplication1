@@ -3,7 +3,7 @@
     var tasks = ViewBag.Tasks as List<WebApplication1.Models.TaskItem> ?? new();
 }
 
-<h1>Список задач</h1>
+<h1>Мій "To-Do List":</h1>
 
 <form asp-action="Add" method="post" style="display:flex; gap:10px; align-items:center;">
     <div>
@@ -37,11 +37,23 @@
     <tbody>
         @foreach (var task in tasks)
         {
-            <tr>
-                <td>@task.Title</td>
-                <td>@task.Description</td>
+            <tr id="row-@task.Id">
+                <td>
+                    <form asp-action="Edit" method="post" id="edit-form-@task.Id" style="margin:0;">
+                        <input type="hidden" name="Id" value="@task.Id" />
+                        <span class="title-display">@task.Title</span>
+                        <input name="Title" class="title-input" style="display:none" value="@task.Title" />
+                </td>
+                <td>
+                        <span class="desc-display">@task.Description</span>
+                        <input name="Description" class="desc-input" style="display:none" value="@task.Description" />
+                </td>
                 <td>@(task.IsCompleted ? "✔️" : "❌")</td>
                 <td>
+                    <button type="button" onclick="toggleEdit('@task.Id')">Редагувати</button>
+                    <button type="submit" style="display:none;">OK</button>
+                    </form>
+
                     <form asp-action="ToggleComplete" method="post" style="display:inline">
                         <input type="hidden" name="id" value="@task.Id" />
                         <button type="submit">Перемкнути</button>
@@ -53,6 +65,7 @@
                 </td>
             </tr>
         }
+
     </tbody>
 </table>
 
@@ -60,4 +73,33 @@
     @{
         await Html.RenderPartialAsync("_ValidationScriptsPartial");
     }
+    <script>
+        function toggleEdit(id) {
+            const row = document.getElementById(`row-${id}`);
+            const titleDisplay = row.querySelector('.title-display');
+            const descDisplay = row.querySelector('.desc-display');
+            const titleInput = row.querySelector('.title-input');
+            const descInput = row.querySelector('.desc-input');
+            const button = row.querySelector('button[type="button"]');
+
+            const editing = titleInput.style.display === 'inline' || titleInput.style.display === 'block';
+
+            if (!editing) {
+                // Вмикаємо редагування
+                titleDisplay.style.display = 'none';
+                descDisplay.style.display = 'none';
+                titleInput.style.display = 'inline-block';
+                descInput.style.display = 'inline-block';
+                button.textContent = 'OK';
+            } else {
+                // Встановлюємо приховані поля у форму (якщо вони є)
+                const form = row.querySelector('form');
+                // Якщо в тебе інпутів у формі нема, треба їх додати динамічно або використовувати інший підхід
+
+                // Сабміт форми
+                form.submit();
+            }
+        }
+
+    </script>
 }

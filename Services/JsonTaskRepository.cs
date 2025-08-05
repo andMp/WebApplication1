@@ -58,5 +58,17 @@ namespace WebApplication1.Services
                 Console.WriteLine($"Помилка при збереженні задач: {ex.Message}");
             }
         }
+
+        public void Update(TaskItem task)
+        {
+            var tasks = LoadTasks();
+            var existing = tasks.FirstOrDefault(t => t.Id == task.Id);
+            if (existing != null)
+            {
+                existing.Title = task.Title;
+                existing.Description = task.Description;
+                SaveTasks(tasks);
+            }
+        }
     }
 }

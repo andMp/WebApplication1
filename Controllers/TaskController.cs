@@ -60,5 +60,19 @@ namespace WebApplication1.Controllers
             _repo.SaveTasks(tasks);
             return RedirectToAction("Index");
         }
+
+        [HttpPost]
+        public IActionResult Edit(Guid Id, string Title, string Description)
+        {
+            var tasks = _repo.LoadTasks();
+            var task = tasks.FirstOrDefault(t => t.Id == Id);
+            if (task == null) return NotFound();
+
+            task.Title = Title;
+            task.Description = Description;
+            _repo.SaveTasks(tasks);
+
+            return RedirectToAction("Index");
+        }
     }
 }
