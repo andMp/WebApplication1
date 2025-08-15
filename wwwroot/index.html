@@ -1,0 +1,187 @@
+﻿<!doctype html>
+<html lang="uk">
+<head>
+    <meta charset="utf-8" />
+    <title>Розклад стрімів</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body {
+            font-family: system-ui, sans-serif;
+            margin: 24px;
+            max-width: 900px;
+        }
+
+        form, .filters {
+            display: grid;
+            gap: 8px;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            align-items: center;
+        }
+
+        input, button, select {
+            padding: 8px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+        }
+
+        th, td {
+            border-bottom: 1px solid #ccc;
+            padding: 8px;
+            text-align: left;
+        }
+
+        .row-actions button {
+            margin-right: 6px;
+        }
+
+        .muted {
+            opacity: .7;
+        }
+
+        .status-0 {
+            font-weight: 600;
+        }
+        /* Очікується */
+        .status-1 {
+            text-decoration: line-through;
+        }
+    </style>
+</head>
+<body>
+    <h1>Розклад стрімів</h1>
+
+    <h2>Створити стрім</h2>
+    <form id="createForm">
+        <input id="title" placeholder="Назва стріму" required maxlength="200" />
+        <input id="streamerId" placeholder="StreamerId (GUID)" required />
+        <input id="startTime" type="datetime-local" required />
+        <button type="submit">Створити</button>
+    </form>
+
+    <h2>Список</h2>
+    <div class="filters">
+        <input id="filterStreamerId" placeholder="Фільтр: StreamerId (GUID)" />
+        <input id="filterDate" type="date" />
+        <div class="muted">або</div>
+        <button id="btnToday">Сьогодні</button>
+    </div>
+
+    <table id="tbl">
+        <thead>
+            <tr>
+                <th>Назва</th>
+                <th>Streamer</th>
+                <th>Початок (локальний)</th>
+                <th>Status</th>
+                <th>Дії</th>
+            </tr>
+        </thead>
+        <tbody></tbody>
+    </table>
+
+    <script>
+        const api = '/streams';
+
+        function toUtc(dateLocalStr) {
+            // value з <input type="datetime-local"> — без зони. Трактуємо як локальний і конвертимо в UTC ISO.
+            const dt = new Date(dateLocalStr);
+            return new Date(dt.getTime() - dt.getTimezoneOffset() * 60000).toISOString();
+        }
+
+        function fmtLocal(isoUtc) {
+            if (!isoUtc) return '';
+            const dt = new Date(isoUtc);
+            return dt.toLocaleString();
+        }
+
+        async function load(params = {}) {
+            const url = new URL(api, location.origin);
+            for (const [k, v] of Object.entries(params)) {
+                if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
+            }
+            const res = await fetch(url);
+            const data = await res.json();
+            render(data);
+        }
+
+        function render(list) {
+            const tb = document.querySelector('#tbl tbody');
+            tb.innerHTML = '';
+            for (const x of list) {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                <td class="status-${x.status}">${x.nazva}</td>
+                <td>${x.streamerId}</td>
+                <td>${fmtLocal(x.pochatok)}</td>
+                <td>${x.status === 0 ? 'Запланований' : 'Завершений'}</td>
+                <td class="row-actions">
+                  <button data-act="done" data-id="${x.id}" ${x.status === 1 ? 'disabled' : ''}>Завершити</button>
+                  <button data-act="del" data-id="${x.id}">Видалити</button>
+                </td>
+              `;
+                tb.appendChild(tr);
+            }
+
+            tb.querySelectorAll('button').forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const id = btn.dataset.id;
+                    const act = btn.dataset.act;
+                    if (act === 'del') {
+                        if (!confirm('Видалити стрім?')) return;
+                        await fetch(`${api}/${id}`, { method: 'DELETE' });
+                        await load(currentFilter());
+                    } else if (act === 'done') {
+                        await fetch(`${api}/${id}/status`, {
+                            method: 'PATCH',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: 1 })
+                        });
+                        await load(currentFilter());
+                    }
+                });
+            });
+        }
+
+        function currentFilter() {
+            const streamerId = document.getElementById('filterStreamerId').value.trim();
+            const date = document.getElementById('filterDate').value;
+            return { streamerId, date };
+        }
+
+        document.getElementById('createForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nazva = document.getElementById('title').value.trim();
+            const streamerId = document.getElementById('streamerId').value.trim();
+            const startLocal = document.getElementById('startTime').value;
+            if (!nazva || !streamerId || !startLocal) return;
+
+            const res = await fetch(api, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    nazva,
+                    streamerId,
+                    pochatok: toUtc(startLocal) // надсилаємо UTC
+                })
+            });
+
+            if (!res.ok) {
+                alert('Помилка створення');
+                return;
+            }
+            // очистити форму й оновити список
+            e.target.reset();
+            await load(currentFilter());
+        });
+
+        document.getElementById('btnToday').addEventListener('click', () => load({ today: true }));
+
+        // первинне завантаження
+        load();
+    </script>
+</body>
+</html>
