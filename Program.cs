@@ -68,8 +68,12 @@ group.MapPost("/", async (AppDbContext db, CreateStreamDto dto) =>
     var item = new RozkStr
     {
         Nazva = dto.Nazva,
+        Opis=dto.Opis,
         StreamerId = dto.StreamerId,
-        Pochatok = dto.Pochatok.ToUniversalTime()
+        Pochatok = dto.Pochatok.ToUniversalTime(),
+        Status = dto.Status,
+        ChasStvor = dto.ChasStvor.ToUniversalTime(),
+        ReminderMinutes = dto.ReminderMinutes ?? 10
     };
     db.Streams.Add(item);
     await db.SaveChangesAsync();

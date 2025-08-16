@@ -25,22 +25,19 @@ namespace WebApplication1.Services
                     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
                     var nowUtc = DateTime.UtcNow;
-                    var targetFrom = nowUtc.AddMinutes(9);   // вікно 9..11 хв
-                    var targetTo = nowUtc.AddMinutes(11);
 
                     var toRemind = await db.Streams
                         .Where(s => s.Status == StrStatus.Ochikuytsa
-                                    && !s.ReminderSent
-                                    && s.Pochatok >= targetFrom
-                                    && s.Pochatok <= targetTo)
+                                    && s.ReminderMinutes > 0   // є сенс нагадувати
+                                    && s.Pochatok.AddMinutes(-s.ReminderMinutes) <= nowUtc
+                                    && s.Pochatok > nowUtc)
                         .ToListAsync(stoppingToken);
 
                     foreach (var s in toRemind)
                     {
-                        _log.LogInformation("🔔 Нагадування: '{Title}' (Streamer {StreamerId}) о {Start:u}",
-                            s.Nazva, s.StreamerId, s.Pochatok);
-
-                        s.ReminderSent = true;
+                        _log.LogInformation("🔔 Нагадування: '{Title}' (Streamer {StreamerId}) о {Start:u} (за {Minutes} хв)",
+                            s.Nazva, s.StreamerId, s.Pochatok, s.ReminderMinutes);
+                        s.ReminderMinutes = 0;
                     }
 
                     if (toRemind.Count > 0)
@@ -54,5 +51,6 @@ namespace WebApplication1.Services
                 await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
             }
         }
+
     }
 }

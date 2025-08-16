@@ -59,6 +59,12 @@
         <input id="title" placeholder="Назва стріму" required maxlength="200" />
         <input id="streamerId" placeholder="StreamerId (GUID)" required />
         <input id="startTime" type="datetime-local" required />
+        <input id="opis" placeholder="Опис стріму" />
+        <input id="reminderMinutes" type="number" placeholder="Нагадати за хвилин" min="0" />
+        <select id="status">
+            <option value="0">Запланований</option>
+            <option value="1">Завершений</option>
+        </select>
         <button type="submit">Створити</button>
     </form>
 
@@ -74,6 +80,7 @@
         <thead>
             <tr>
                 <th>Назва</th>
+                <th>Опис</th>
                 <th>Streamer</th>
                 <th>Початок (локальний)</th>
                 <th>Status</th>
@@ -155,28 +162,33 @@
         document.getElementById('createForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const nazva = document.getElementById('title').value.trim();
+            const opis = document.getElementById('title').value.trim();
             const streamerId = document.getElementById('streamerId').value.trim();
             const startLocal = document.getElementById('startTime').value;
+            const opis = document.getElementById('opis').value.trim();
+            const reminderMinutes = parseInt(document.getElementById('reminderMinutes').value) || 10;
+            const status = parseInt(document.getElementById('status').value);
+
             if (!nazva || !streamerId || !startLocal) return;
 
-            const res = await fetch(api, {
+            const res = await fetch('/streams', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     nazva,
                     streamerId,
-                    pochatok: toUtc(startLocal) // надсилаємо UTC
+                    pochatok: new Date(startLocal).toISOString(),
+                    opis,
+                    reminderMinutes,
+                    status
                 })
             });
 
-            if (!res.ok) {
-                alert('Помилка створення');
-                return;
-            }
-            // очистити форму й оновити список
+            if (!res.ok) { alert('Помилка створення'); return; }
             e.target.reset();
-            await load(currentFilter());
+            await load(); // оновлення списку стрімів
         });
+
 
         document.getElementById('btnToday').addEventListener('click', () => load({ today: true }));
 
