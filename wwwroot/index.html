@@ -122,6 +122,7 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                 <td class="status-${x.status}">${x.nazva}</td>
+                <td>${x.opis || ''}</td>
                 <td>${x.streamerId}</td>
                 <td>${fmtLocal(x.pochatok)}</td>
                 <td>${x.status === 0 ? 'Запланований' : 'Завершений'}</td>
@@ -162,10 +163,9 @@
         document.getElementById('createForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             const nazva = document.getElementById('title').value.trim();
-            const opis = document.getElementById('title').value.trim();
+            const opis = document.getElementById('opis').value.trim();
             const streamerId = document.getElementById('streamerId').value.trim();
             const startLocal = document.getElementById('startTime').value;
-            const opis = document.getElementById('opis').value.trim();
             const reminderMinutes = parseInt(document.getElementById('reminderMinutes').value) || 10;
             const status = parseInt(document.getElementById('status').value);
 
@@ -177,7 +177,7 @@
                 body: JSON.stringify({
                     nazva,
                     streamerId,
-                    pochatok: new Date(startLocal).toISOString(),
+                    pochatok: toUtc(startLocal),
                     opis,
                     reminderMinutes,
                     status
