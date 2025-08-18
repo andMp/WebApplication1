@@ -1,132 +1,62 @@
-using Microsoft.EntityFrameworkCore;
-using Microsoft.OpenApi.Models;
-using WebApplication1.Data;
-using WebApplication1.Models;
 using WebApplication1.Services;
 
-/*Задание: REST API для управления расписанием стримов на ASP.NET Core
-Цель:
-Создать REST API, которое позволяет стримерам планировать стримы, а пользователям — просматривать расписание.
-
-Функционал API:
-1. Работа со стримами
-Создать запланированный стрим (POST /streams)
-Входные данные: title, streamerId, startTime
-API возвращает streamId.
-Получить список всех запланированных стримов (GET /streams)
-Опционально: фильтрация по streamerId.
-Получить информацию о конкретном стриме (GET /streams/{streamId}
-Удалить запланированный стрим (DELETE /streams/{streamId})
-Фильтрация по дате (например, стримы на сегодня).
-Добавить статус (запланирован / завершён).
-Отправка напоминаний (например, за 10 минут до начала стрима, но это потребует фоновых задач)*/
-
+/*Задание:
+Создать интерфейс ILoggerService с методом void Log(string message).
+Реализовать ConsoleLoggerService, который пишет логи в Console.WriteLine().
+Создать интерфейс IUserService с методом string GetUserById(int id).
+Реализовать UserService, который:
+Получает ILoggerService через DI.
+В методе GetUserById(id) сначала логирует обращение, затем возвращает User{id}.
+Зарегистрировать сервисы ILoggerService и IUserService в DI.
+Добавить Middleware, который:
+Получает IUserService из DI.
+Вызывает GetUserById(1).
+Записывает результат в HttpContext.Response.*/
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddDbContext<AppDbContext>(opt =>
-    opt.UseSqlite(builder.Configuration.GetConnectionString("Sqlite") ?? "Data Source=streams.db"));
-
-builder.Services.AddCors(opt =>
-{
-    opt.AddDefaultPolicy(p => p
-        .AllowAnyOrigin()
-        .AllowAnyHeader()
-        .AllowAnyMethod());
-});
-
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen(c =>
-{
-    c.SwaggerDoc("v1", new OpenApiInfo { Title = "Streams API", Version = "v1" });
-});
-
-builder.Services.AddHostedService<ReminderService>();
+builder.Services.AddSingleton<ILoggerService, ConsoleLoggerService>();
+builder.Services.AddTransient<IUserService, UserService>();
 
 var app = builder.Build();
 
-using (var scope = app.Services.CreateScope())
+app.Run(async context =>
 {
-    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    await db.Database.EnsureCreatedAsync();
-}
+    context.Response.ContentType = "text/plain; charset=utf-8";
 
-app.UseCors();
-app.UseDefaultFiles(); // шукає index.html
-app.UseStaticFiles();
+    var userService = context.RequestServices.GetRequiredService<IUserService>();
+    var user = userService.GetUserById(1);
 
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Streams API v1"));
-}
-
-var group = app.MapGroup("/streams");
-
-group.MapPost("/", async (AppDbContext db, CreateStreamDto dto) =>
-{
-    var item = new RozkStr
-    {
-        Nazva = dto.Nazva,
-        Opis=dto.Opis,
-        StreamerId = dto.StreamerId,
-        Pochatok = dto.Pochatok.ToUniversalTime(),
-        Status = dto.Status,
-        ChasStvor = dto.ChasStvor.ToUniversalTime(),
-        ReminderMinutes = dto.ReminderMinutes ?? 10
-    };
-    db.Streams.Add(item);
-    await db.SaveChangesAsync();
-    return Results.Created($"/streams/{item.Id}", new { streamId = item.Id });
+    await context.Response.WriteAsync($"Результат из UserService: {user}");
 });
 
-group.MapGet("/", async (AppDbContext db, int? streamerId, string? date, bool? today) =>
+
+namespace WebApplication1.Services
 {
-    var q = db.Streams.AsQueryable();
-
-    if (streamerId.HasValue && streamerId.Value > 0)
-        q = q.Where(x => x.StreamerId == streamerId.Value);
-
-    if (today == true)
+    public interface ILoggerService
     {
-        var nowUtc = DateTime.UtcNow;
-        var start = new DateTime(nowUtc.Year, nowUtc.Month, nowUtc.Day, 0, 0, 0, DateTimeKind.Utc);
-        var end = start.AddDays(1);
-        q = q.Where(x => x.Pochatok >= start && x.Pochatok < end);
-    }
-    else if (!string.IsNullOrWhiteSpace(date) && DateTime.TryParse(date, out var d))
-    {
-        var start = DateTime.SpecifyKind(d.Date, DateTimeKind.Utc);
-        var end = start.AddDays(1);
-        q = q.Where(x => x.Pochatok >= start && x.Pochatok < end);
+        void Log(string message);
     }
 
-    var list = await q.OrderBy(x => x.Pochatok).ToListAsync();
-    return Results.Ok(list);
-});
+    public class ConsoleLoggerService : ILoggerService
+    {
+        public void Log(string message) => Console.WriteLine($"[LOG] {message}");
+    }
 
-group.MapGet("/{id:guid}", async (AppDbContext db, Guid id) =>
-{
-    var item = await db.Streams.FindAsync(id);
-    return item is null ? Results.NotFound() : Results.Ok(item);
-});
+    public interface IUserService
+    {
+        string GetUserById(int id);
+    }
 
-group.MapDelete("/{id:guid}", async (AppDbContext db, Guid id) =>
-{
-    var item = await db.Streams.FindAsync(id);
-    if (item is null) return Results.NotFound();
-    db.Streams.Remove(item);
-    await db.SaveChangesAsync();
-    return Results.NoContent();
-});
+    public class UserService : IUserService
+    {
+        private readonly ILoggerService _logger;
+        public UserService(ILoggerService logger) => _logger = logger;
 
-group.MapPatch("/{id:guid}/status", async (AppDbContext db, Guid id, UpdateStatusDto body) =>
-{
-    var item = await db.Streams.FindAsync(id);
-    if (item is null) return Results.NotFound();
-    item.Status = body.Status;
-    await db.SaveChangesAsync();
-    return Results.Ok(item);
-});
-
-app.Run();
+        public string GetUserById(int id)
+        {
+            _logger.Log($"Вызван метод GetUserById с id={id}");
+            return $"User{{id={id}}}";
+        }
+    }
+}
