@@ -75,7 +75,7 @@ app.MapGet("/headers", (HttpRequest request) =>//  /headers
     return Results.Json(headers);
 });
 
-var products = new List<Product> // Список товаров и /products?category=Electronics
+var products = new List<Product> // Список товарів та /products?category=Electronics
 
 {
     new Product { Id = 1, Name = "Laptop", Category = "Electronics" },
